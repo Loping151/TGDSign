@@ -14,6 +14,7 @@ from gsuid_core.utils.database.base_models import (
     with_session,
 )
 from gsuid_core.utils.database.startup import exec_list
+from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
 
 exec_list.extend(
     [
@@ -229,3 +230,23 @@ class TGDSignRecord(BaseIDModel, table=True):
         if not record:
             return False
         return record.app_sign >= 1 and record.game_sign >= 1
+
+
+@site.register_admin
+class TGDBindAdmin(GsAdminModel):
+    pk_name = "id"
+    page_schema = PageSchema(
+        label="塔吉多绑定管理",
+        icon="fa fa-users",
+    )
+    model = TGDBind
+
+
+@site.register_admin
+class TGDUserAdmin(GsAdminModel):
+    pk_name = "id"
+    page_schema = PageSchema(
+        label="塔吉多用户管理",
+        icon="fa fa-user",
+    )
+    model = TGDUser
