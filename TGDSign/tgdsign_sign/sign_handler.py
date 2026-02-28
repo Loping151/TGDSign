@@ -27,15 +27,11 @@ async def _do_sign_single(
     tgd_uid = tgd_user.tgd_uid
     role_name = tgd_user.role_name
     display_name = role_name or tgd_uid
-    # uid 总是有值: 有角色时为 role_id, 无角色时为 tgd_uid
-    has_role = bool(uid) and uid != tgd_uid
 
-    # 检查本地签到状态
+    # 检查本地签到状态 (用 uid 查)
     sign_record = await TGDSignRecord.get_sign_data(uid)
-    if has_role and TGDSignRecord.is_all_complete(sign_record):
+    if sign_record and sign_record.app_sign >= 1 and sign_record.game_sign >= 1:
         return f"[{display_name}] 今日已签到，请勿重复签到"
-    if not has_role and sign_record and sign_record.app_sign >= 1:
-        return f"[{display_name}] 今日APP已签到，请勿重复签到"
 
     # 刷新 token
     res = await tgd_api.refresh_token(
@@ -54,41 +50,6 @@ async def _do_sign_single(
         bot_id=tgd_user.bot_id,
         cookie=new_refresh_token,
     )
-
-    # 获取所有游戏角色
-    game_roles: list[tuple[str, str]] = []  # [(role_id, role_name)]
-    if has_role:
-        roles_res = await tgd_api.get_game_roles(
-            access_token=access_token,
-            uid=tgd_uid,
-            device_id=tgd_user.device_id,
-        )
-        if roles_res["status"] and roles_res.get("data"):
-            roles_list = (
-                roles_res["data"].get("roles", [])
-                if isinstance(roles_res["data"], dict)
-                else []
-            )
-            for r in roles_list:
-                rid = str(r.get("roleId", ""))
-                rname = r.get("roleName", rid)
-                if rid:
-                    game_roles.append((rid, rname))
-
-        # 至少保留当前存储的角色
-        if not game_roles:
-            game_roles = [(uid, role_name)]
-
-        # 更新主角色名
-        for rid, rname in game_roles:
-            if rid == uid and rname and rname != role_name:
-                await TGDUser.update_data_by_uid(
-                    uid=uid,
-                    bot_id=tgd_user.bot_id,
-                    role_name=rname,
-                )
-                display_name = rname
-                break
 
     msg_parts = [f"[{display_name}] 签到结果"]
 
@@ -114,8 +75,9 @@ async def _do_sign_single(
     else:
         msg_parts.append("APP今日已签到")
 
-    # 游戏签到（所有角色）
-    if game_roles:
+    # 游戏签到（使用登录时存储的 role_id）
+    has_role = bool(uid) and uid != tgd_uid
+    if has_role:
         await asyncio.sleep(random.uniform(0.5, 1.5))
 
         signin_state = await tgd_api.get_signin_state(
@@ -126,57 +88,37 @@ async def _do_sign_single(
         )
 
         if not sign_record or sign_record.game_sign < 1:
-            all_success = True
-            multi = len(game_roles) > 1
-            for role_id, rname in game_roles:
-                res = await tgd_api.game_signin(
-                    access_token=access_token, role_id=role_id
-                )
-                rdisplay = rname or role_id
-                if res["status"]:
-                    reward_msg = "游戏签到成功"
-                    if (
-                        signin_state["status"]
-                        and signin_rewards["status"]
-                    ):
-                        try:
-                            days = signin_state["data"]["days"]
-                            reward = signin_rewards["data"][days]
-                            reward_msg = (
-                                f"游戏签到成功，"
-                                f"获得{reward['name']}*{reward['num']}"
-                            )
-                        except (KeyError, IndexError, TypeError):
-                            pass
-                    if multi:
-                        msg_parts.append(f"[{rdisplay}] {reward_msg}")
-                    else:
-                        msg_parts.append(reward_msg)
-                else:
-                    msg = res["message"]
-                    if "已经签到" in msg or "签到过" in msg:
-                        if multi:
-                            msg_parts.append(
-                                f"[{rdisplay}] 游戏今日已签到"
-                            )
-                        else:
-                            msg_parts.append("游戏今日已签到")
-                    else:
-                        if multi:
-                            msg_parts.append(
-                                f"[{rdisplay}] 游戏签到失败: {msg}"
-                            )
-                        else:
-                            msg_parts.append(f"游戏签到失败: {msg}")
-                        all_success = False
-
-                if multi:
-                    await asyncio.sleep(random.uniform(0.3, 0.8))
-
-            if all_success:
+            res = await tgd_api.game_signin(
+                access_token=access_token, role_id=uid
+            )
+            if res["status"]:
+                reward_msg = "游戏签到成功"
+                if (
+                    signin_state["status"]
+                    and signin_rewards["status"]
+                ):
+                    try:
+                        days = signin_state["data"]["days"]
+                        reward = signin_rewards["data"][days]
+                        reward_msg = (
+                            f"游戏签到成功，"
+                            f"获得{reward['name']}*{reward['num']}"
+                        )
+                    except (KeyError, IndexError, TypeError):
+                        pass
+                msg_parts.append(reward_msg)
                 await TGDSignRecord.upsert_sign(
                     TGDSignData.build_game_sign(uid)
                 )
+            else:
+                msg = res["message"]
+                if "已经签到" in msg or "签到过" in msg:
+                    msg_parts.append("游戏今日已签到")
+                    await TGDSignRecord.upsert_sign(
+                        TGDSignData.build_game_sign(uid)
+                    )
+                else:
+                    msg_parts.append(f"游戏签到失败: {msg}")
         else:
             msg_parts.append("游戏今日已签到")
 
