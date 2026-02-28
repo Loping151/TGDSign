@@ -10,7 +10,9 @@ from gsuid_core.gss import gss
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.segment import MessageSegment
+from gsuid_core.subscribe import gs_subscribe
 
+from ..tgdsign_config import SIGN_RESULT_TYPE
 from ..tgdsign_config.tgdsign_config import TGDSignConfig
 from ..utils.api.requests import tgd_api
 from ..utils.database.models import (
@@ -295,4 +297,17 @@ async def tgd_auto_sign_task() -> str:
         f"[塔吉多] 自动签到完成\n"
         f"成功 {success_count} 个账号，失败 {fail_count} 个账号"
     )
+
+    # 通过订阅系统推送签到结果
+    try:
+        subscribes = await gs_subscribe.get_subscribe(SIGN_RESULT_TYPE)
+        if subscribes:
+            for sub in subscribes:
+                try:
+                    await sub.send(msg)
+                except Exception as e:
+                    logger.error(f"[TGDSign] 订阅推送失败: {e}")
+    except Exception as e:
+        logger.error(f"[TGDSign] 获取订阅列表失败: {e}")
+
     return msg
