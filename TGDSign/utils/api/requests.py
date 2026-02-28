@@ -3,6 +3,7 @@
 import time
 import traceback
 import urllib.parse as qs
+from typing import Optional
 
 import httpx
 from gsuid_core.logger import logger
@@ -34,16 +35,22 @@ from .api import (
     GAMESIGNIN,
     GETSIGNINSTATE,
     GETSIGNINREWARDS,
+    GETGAMEROLES,
 )
 from .calculate import aes_base64_encode, generate_sign
 
 
-class TaygedoApi:
-    def __init__(self):
-        self.client = httpx.AsyncClient(timeout=200)
+def _get_proxy() -> Optional[str]:
+    from ...tgdsign_config.tgdsign_config import TGDSignConfig
 
-    async def close(self):
-        await self.client.aclose()
+    proxy = TGDSignConfig.get_config("LocalProxyUrl").data
+    return proxy if proxy else None
+
+
+class TaygedoApi:
+    def _get_client(self) -> httpx.AsyncClient:
+        proxy = _get_proxy()
+        return httpx.AsyncClient(timeout=200, proxy=proxy)
 
     async def send_captcha(self, phone: str, device_id: str):
         data = {
@@ -67,9 +74,10 @@ class TaygedoApi:
         headers = {**REQUEST_HEADERS_BASE}
 
         try:
-            response = await self.client.post(
-                SENDCAPTCHA, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    SENDCAPTCHA, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 发送验证码响应: {resp}")
             if (
@@ -107,9 +115,10 @@ class TaygedoApi:
         headers = {**REQUEST_HEADERS_BASE}
 
         try:
-            response = await self.client.post(
-                CHECKCAPTCHA, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    CHECKCAPTCHA, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 验证验证码响应: {resp}")
             if (
@@ -158,9 +167,10 @@ class TaygedoApi:
         headers = {**REQUEST_HEADERS_BASE}
 
         try:
-            response = await self.client.post(
-                LOGIN, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    LOGIN, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 登录响应: {resp}")
             if (
@@ -198,9 +208,10 @@ class TaygedoApi:
         }
 
         try:
-            response = await self.client.post(
-                USERCENTERLOGIN, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    USERCENTERLOGIN, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 用户中心登录响应: {resp}")
             if (
@@ -232,7 +243,8 @@ class TaygedoApi:
         }
 
         try:
-            response = await self.client.post(REFRESHTOKEN, headers=headers)
+            async with self._get_client() as client:
+                response = await client.post(REFRESHTOKEN, headers=headers)
             resp = response.json()
             logger.debug(f"[TGDSign] 刷新token响应: {resp}")
             if (
@@ -257,13 +269,14 @@ class TaygedoApi:
         headers = {"Authorization": access_token}
 
         try:
-            response = await self.client.get(
-                GETBINDROLE,
-                headers=headers,
-                params={"uid": uid, "gameId": GAMEID},
-            )
+            async with self._get_client() as client:
+                response = await client.get(
+                    GETBINDROLE,
+                    headers=headers,
+                    params={"uid": uid, "gameId": GAMEID},
+                )
             resp = response.json()
-            logger.debug(f"[TGDSign] 获取绑定角色响应: {resp}")
+            logger.info(f"[TGDSign] 获取绑定角色响应: {resp}")
             if (
                 response.status_code == 200
                 and resp.get("code") == 0
@@ -272,7 +285,7 @@ class TaygedoApi:
                 return {
                     "status": True,
                     "message": resp["msg"],
-                    "data": resp["data"],
+                    "data": resp.get("data") or {},
                 }
             else:
                 logger.error(f"[TGDSign] 获取绑定角色失败: {resp}")
@@ -284,6 +297,46 @@ class TaygedoApi:
             logger.error(f"[TGDSign] 获取绑定角色异常: {e}")
             logger.error(traceback.format_exc())
             return {"status": False, "message": "获取绑定角色失败，详情请查看日志"}
+
+    async def get_game_roles(self, access_token: str, uid: str, device_id: str):
+        """获取用户所有游戏角色列表"""
+        headers = {
+            "platform": "android",
+            "authorization": access_token,
+            "uid": uid,
+            "deviceid": device_id,
+            "appversion": APPVERSION,
+            "User-Agent": "okhttp/4.12.0",
+        }
+
+        try:
+            async with self._get_client() as client:
+                response = await client.post(
+                    GETGAMEROLES,
+                    headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
+                    content=qs.urlencode({"gameId": GAMEID}),
+                )
+            resp = response.json()
+            logger.info(f"[TGDSign] 获取游戏角色列表响应: {resp}")
+            if (
+                response.status_code == 200
+                and resp.get("code") == 0
+            ):
+                return {
+                    "status": True,
+                    "message": resp.get("msg", "ok"),
+                    "data": resp.get("data") or [],
+                }
+            else:
+                logger.error(f"[TGDSign] 获取游戏角色列表失败: {resp}")
+                return {
+                    "status": False,
+                    "message": resp.get("msg", "获取游戏角色列表失败"),
+                }
+        except Exception as e:
+            logger.error(f"[TGDSign] 获取游戏角色列表异常: {e}")
+            logger.error(traceback.format_exc())
+            return {"status": False, "message": "获取游戏角色列表失败，详情请查看日志"}
 
     async def app_signin(self, access_token: str, uid: str, device_id: str):
         data = {"communityId": COMMUNITYID}
@@ -298,9 +351,10 @@ class TaygedoApi:
         }
 
         try:
-            response = await self.client.post(
-                APPSIGNIN, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    APPSIGNIN, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] APP签到响应: {resp}")
             if (
@@ -314,8 +368,12 @@ class TaygedoApi:
                     "data": resp["data"],
                 }
             else:
-                logger.error(f"[TGDSign] APP签到失败: {resp}")
-                return {"status": False, "message": resp.get("msg", "APP签到失败")}
+                msg = resp.get("msg", "APP签到失败")
+                if "签到" in msg:
+                    logger.debug(f"[TGDSign] APP签到: {resp}")
+                else:
+                    logger.error(f"[TGDSign] APP签到失败: {resp}")
+                return {"status": False, "message": msg}
         except Exception as e:
             logger.error(f"[TGDSign] APP签到异常: {e}")
             logger.error(traceback.format_exc())
@@ -327,9 +385,10 @@ class TaygedoApi:
         headers = {**REQUEST_HEADERS_BASE, "authorization": access_token}
 
         try:
-            response = await self.client.post(
-                GAMESIGNIN, content=payload, headers=headers
-            )
+            async with self._get_client() as client:
+                response = await client.post(
+                    GAMESIGNIN, content=payload, headers=headers
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 游戏签到响应: {resp}")
             if (
@@ -339,8 +398,12 @@ class TaygedoApi:
             ):
                 return {"status": True, "message": resp["msg"]}
             else:
-                logger.error(f"[TGDSign] 游戏签到失败: {resp}")
-                return {"status": False, "message": resp.get("msg", "游戏签到失败")}
+                msg = resp.get("msg", "游戏签到失败")
+                if "签到" in msg:
+                    logger.debug(f"[TGDSign] 游戏签到: {resp}")
+                else:
+                    logger.error(f"[TGDSign] 游戏签到失败: {resp}")
+                return {"status": False, "message": msg}
         except Exception as e:
             logger.error(f"[TGDSign] 游戏签到异常: {e}")
             logger.error(traceback.format_exc())
@@ -350,11 +413,12 @@ class TaygedoApi:
         headers = {"Authorization": access_token}
 
         try:
-            response = await self.client.get(
-                GETSIGNINSTATE,
-                headers=headers,
-                params={"gameId": GAMEID},
-            )
+            async with self._get_client() as client:
+                response = await client.get(
+                    GETSIGNINSTATE,
+                    headers=headers,
+                    params={"gameId": GAMEID},
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 获取签到状态响应: {resp}")
             if (
@@ -382,11 +446,12 @@ class TaygedoApi:
         headers = {"Authorization": access_token}
 
         try:
-            response = await self.client.get(
-                GETSIGNINREWARDS,
-                headers=headers,
-                params={"gameId": GAMEID},
-            )
+            async with self._get_client() as client:
+                response = await client.get(
+                    GETSIGNINREWARDS,
+                    headers=headers,
+                    params={"gameId": GAMEID},
+                )
             resp = response.json()
             logger.debug(f"[TGDSign] 获取签到奖励响应: {resp}")
             if (

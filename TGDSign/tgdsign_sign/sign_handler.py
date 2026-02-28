@@ -60,18 +60,17 @@ async def _do_sign_single(
         res = await tgd_api.get_bind_role(
             access_token=access_token, uid=tgd_uid
         )
-        if res["status"] and res.get("data"):
-            if "roleId" in res["data"]:
-                new_role_id = str(res["data"]["roleId"])
-                new_role_name = res["data"].get("roleName", role_name)
-                if new_role_id != uid or new_role_name != role_name:
-                    await TGDUser.update_data_by_uid(
-                        uid=uid,
-                        bot_id=tgd_user.bot_id,
-                        role_name=new_role_name,
-                    )
-                    role_name = new_role_name
-                    display_name = role_name
+        if res["status"] and "roleId" in res.get("data", {}):
+            new_role_id = str(res["data"]["roleId"])
+            new_role_name = res["data"].get("roleName", role_name)
+            if new_role_id != uid or new_role_name != role_name:
+                await TGDUser.update_data_by_uid(
+                    uid=uid,
+                    bot_id=tgd_user.bot_id,
+                    role_name=new_role_name,
+                )
+                role_name = new_role_name
+                display_name = role_name
 
     msg_parts = [f"[{display_name}] 签到结果"]
 
@@ -88,9 +87,14 @@ async def _do_sign_single(
             msg_parts.append(f"APP签到成功，获得{exp}经验，{gold_coin}金币")
             await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(uid))
         else:
-            msg_parts.append(f"APP签到失败: {res['message']}")
+            msg = res["message"]
+            if "已经签到" in msg or "签到过" in msg:
+                msg_parts.append("APP今日已签到")
+                await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(uid))
+            else:
+                msg_parts.append(f"APP签到失败: {msg}")
     else:
-        msg_parts.append("APP签到: 已完成")
+        msg_parts.append("APP今日已签到")
 
     # 游戏签到（仅在绑定角色时）
     if has_role:
@@ -120,11 +124,14 @@ async def _do_sign_single(
                 msg_parts.append(reward_msg)
                 await TGDSignRecord.upsert_sign(TGDSignData.build_game_sign(uid))
             else:
-                msg_parts.append(f"游戏签到失败: {res['message']}")
+                msg = res["message"]
+                if "已经签到" in msg or "签到过" in msg:
+                    msg_parts.append("游戏今日已签到")
+                    await TGDSignRecord.upsert_sign(TGDSignData.build_game_sign(uid))
+                else:
+                    msg_parts.append(f"游戏签到失败: {msg}")
         else:
-            msg_parts.append("游戏签到: 已完成")
-    else:
-        msg_parts.append("未绑定游戏角色，跳过游戏签到")
+            msg_parts.append("游戏今日已签到")
 
     return "\n".join(msg_parts)
 

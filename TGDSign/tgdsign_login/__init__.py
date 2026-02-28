@@ -15,6 +15,7 @@ from gsuid_core.models import Event
 from gsuid_core.sv import SV
 from gsuid_core.web_app import app
 
+from ..tgdsign_config.tgdsign_config import TGDSignConfig
 from ..utils.cache import TimedCache
 from ..utils.api.api import GAMEID
 from ..utils.api.calculate import get_random_device_id
@@ -33,14 +34,19 @@ def _get_token(user_id: str) -> str:
     return hashlib.sha256(user_id.encode()).hexdigest()[:8]
 
 
-async def _get_server_url() -> str:
+async def _get_server_url() -> tuple[str, bool]:
+    url = TGDSignConfig.get_config("LoginUrl").data
+    if url:
+        if not url.startswith("http"):
+            url = f"https://{url}"
+        return url, TGDSignConfig.get_config("LoginUrlSelf").data
     HOST = core_config.get_config("HOST")
     PORT = core_config.get_config("PORT")
     if HOST == "localhost" or HOST == "127.0.0.1":
         _host = "localhost"
     else:
         _host = HOST
-    return f"http://{_host}:{PORT}"
+    return f"http://{_host}:{PORT}", True
 
 
 @sv_tgd_login.on_fullmatch(("登录", "登陆", "login"), block=True)
@@ -51,7 +57,7 @@ async def tgd_login(bot: Bot, ev: Event):
 async def page_login(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
     user_token = _get_token(ev.user_id)
-    url = await _get_server_url()
+    url, _ = await _get_server_url()
 
     # 检查是否已有登录进行中
     existing = cache.get(user_token)
@@ -78,7 +84,7 @@ async def page_login(bot: Bot, ev: Event):
             result = cache.get(user_token)
             if result is None:
                 return await bot.send(
-                    "[TGDSign] 登录超时，请重新发送登录指令",
+                    "[TGDSign] 登录超时！",
                     at_sender=at_sender,
                 )
             if result.get("mobile") != -1 and result.get("code") != -1:
@@ -88,7 +94,7 @@ async def page_login(bot: Bot, ev: Event):
         else:
             cache.delete(user_token)
             return await bot.send(
-                "[TGDSign] 登录超时，请重新发送登录指令",
+                "[TGDSign] 登录超时！",
                 at_sender=at_sender,
             )
     except Exception as e:
@@ -144,10 +150,28 @@ async def page_login(bot: Bot, ev: Event):
     role_name = ""
     game_id = GAMEID
     res = await tgd_api.get_bind_role(access_token=access_token, uid=tgd_uid)
-    if res["status"] and res.get("data") and "roleId" in res["data"]:
+    if res["status"] and "roleId" in res.get("data", {}):
         role_id = str(res["data"]["roleId"])
         role_name = res["data"].get("roleName", role_id)
         game_id = str(res["data"].get("gameId", GAMEID))
+    else:
+        # getGameBindRole 未返回角色，尝试 getGameRoles
+        roles_res = await tgd_api.get_game_roles(
+            access_token=access_token, uid=tgd_uid, device_id=device_id
+        )
+        if roles_res["status"] and roles_res.get("data"):
+            roles = roles_res["data"].get("roles", []) if isinstance(roles_res["data"], dict) else []
+            for r in roles:
+                if str(r.get("gameId", "")) == GAMEID:
+                    role_id = str(r.get("roleId", ""))
+                    role_name = r.get("roleName", role_id)
+                    game_id = str(r.get("gameId", GAMEID))
+                    break
+            if not role_id and roles:
+                r = roles[0]
+                role_id = str(r.get("roleId", ""))
+                role_name = r.get("roleName", role_id)
+                game_id = str(r.get("gameId", GAMEID))
 
     # 没有绑定角色时用 tgd_uid 作为 uid
     store_uid = role_id if role_id else tgd_uid
@@ -179,7 +203,7 @@ async def page_login(bot: Bot, ev: Event):
     # 登录后立即签到
     from ..utils.database.models import TGDSignData, TGDSignRecord
 
-    sign_msgs = [f"[TGDSign] {display_name} 登录成功，数据已保存"]
+    sign_msgs = [f"[TGDSign] {display_name} 登录成功"]
 
     # APP签到
     res = await tgd_api.app_signin(
@@ -191,7 +215,12 @@ async def page_login(bot: Bot, ev: Event):
         sign_msgs.append(f"APP签到成功，获得{exp}经验，{gold_coin}金币")
         await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(store_uid))
     else:
-        sign_msgs.append(f"APP签到失败: {res['message']}")
+        msg = res["message"]
+        if "已经签到" in msg or "签到过" in msg:
+            sign_msgs.append("APP今日已签到")
+            await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(store_uid))
+        else:
+            sign_msgs.append(f"APP签到失败: {msg}")
 
     # 游戏签到（仅在绑定角色时）
     if role_id:
@@ -219,9 +248,14 @@ async def page_login(bot: Bot, ev: Event):
                 TGDSignData.build_game_sign(role_id)
             )
         else:
-            sign_msgs.append(f"游戏签到失败: {res['message']}")
-    else:
-        sign_msgs.append("未绑定游戏角色，跳过游戏签到")
+            msg = res["message"]
+            if "已经签到" in msg or "签到过" in msg:
+                sign_msgs.append("游戏今日已签到")
+                await TGDSignRecord.upsert_sign(
+                    TGDSignData.build_game_sign(role_id)
+                )
+            else:
+                sign_msgs.append(f"游戏签到失败: {msg}")
 
     sign_msgs.append("发 tgd开启自动签到 以开启每日自动签到")
     return await bot.send("\n".join(sign_msgs), at_sender=at_sender)
@@ -237,7 +271,7 @@ async def tgd_login_page(auth: str):
         template = _jinja_env.get_template("404.html")
         return HTMLResponse(template.render())
 
-    url = await _get_server_url()
+    url, _ = await _get_server_url()
     template = _jinja_env.get_template("index.html")
     return HTMLResponse(
         template.render(

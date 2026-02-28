@@ -27,6 +27,7 @@ APPSIGNIN = "https://bbs-api.tajiduo.com/apihub/api/signin"
 GAMESIGNIN = "https://bbs-api.tajiduo.com/apihub/awapi/sign"
 GETSIGNINSTATE = "https://bbs-api.tajiduo.com/apihub/awapi/signin/state"
 GETSIGNINREWARDS = "https://bbs-api.tajiduo.com/apihub/awapi/sign/rewards"
+GETGAMEROLES = "https://bbs-api.tajiduo.com/usercenter/api/v2/getGameRoles"
 
 REQUEST_HEADERS_BASE = {
     "platform": "android",

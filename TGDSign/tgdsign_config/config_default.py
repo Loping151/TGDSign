@@ -7,6 +7,7 @@ from gsuid_core.utils.plugins_config.models import (
     GsBoolConfig,
     GsIntConfig,
     GsListStrConfig,
+    GsStrConfig,
 )
 
 CONIFG_DEFAULT: Dict[str, GSC] = {
@@ -40,5 +41,20 @@ CONIFG_DEFAULT: Dict[str, GSC] = {
         "群聊推送签到结果",
         "是否群聊推送签到结果",
         False,
+    ),
+    "LoginUrl": GsStrConfig(
+        "登录链接",
+        "自定义登录页面URL，为空则使用本地地址",
+        "",
+    ),
+    "LoginUrlSelf": GsBoolConfig(
+        "强制登录链接为自己的域名",
+        "强制登录链接为自己的域名",
+        False,
+    ),
+    "LocalProxyUrl": GsStrConfig(
+        "本地代理地址",
+        "API请求使用的代理地址，为空则不使用代理",
+        "",
     ),
 }
