@@ -46,6 +46,10 @@ async def _do_sign_for_account(
     await TGDUser.update_cookie_by_tgd_uid(
         tgd_uid=tgd_uid, cookie=new_refresh_token
     )
+    logger.debug(
+        f"[TGDSign] token已刷新 tgd_uid={tgd_uid} "
+        f"new_token={new_refresh_token[:8]}..."
+    )
 
     msg_parts: list[str] = []
 

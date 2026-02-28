@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Type, TypeVar, Optional
 from datetime import datetime
 
 from sqlmodel import Field, select
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel as PydanticBaseModel
 from gsuid_core.utils.database.base_models import (
@@ -133,10 +133,13 @@ class TGDUser(User, table=True):
         cookie: str,
     ):
         """更新同一账号下所有记录的 cookie"""
-        sql = select(cls).where(cls.tgd_uid == tgd_uid)
-        result = await session.execute(sql)
-        for user in result.scalars().all():
-            user.cookie = cookie
+        sql = (
+            update(cls)
+            .where(cls.tgd_uid == tgd_uid)
+            .values(cookie=cookie)
+        )
+        sql = sql.execution_options(synchronize_session="fetch")
+        await session.execute(sql)
 
 
 class TGDSignData(PydanticBaseModel):
