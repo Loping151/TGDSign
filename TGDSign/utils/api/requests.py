@@ -245,6 +245,12 @@ class TaygedoApi:
         try:
             async with self._get_client() as client:
                 response = await client.post(REFRESHTOKEN, headers=headers)
+            if not response.text:
+                logger.error(
+                    f"[TGDSign] 刷新token空响应: "
+                    f"status={response.status_code}"
+                )
+                return {"status": False, "message": "刷新token返回空响应"}
             resp = response.json()
             logger.debug(f"[TGDSign] 刷新token响应: {resp}")
             if (
@@ -311,10 +317,10 @@ class TaygedoApi:
 
         try:
             async with self._get_client() as client:
-                response = await client.post(
+                response = await client.get(
                     GETGAMEROLES,
-                    headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
-                    content=qs.urlencode({"gameId": GAMEID}),
+                    headers=headers,
+                    params={"gameId": GAMEID},
                 )
             resp = response.json()
             logger.info(f"[TGDSign] 获取游戏角色列表响应: {resp}")

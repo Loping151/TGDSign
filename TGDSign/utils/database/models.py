@@ -124,6 +124,20 @@ class TGDUser(User, table=True):
         result = await session.execute(sql)
         return list(result.scalars().all())
 
+    @classmethod
+    @with_session
+    async def update_cookie_by_tgd_uid(
+        cls: Type[T_TGDUser],
+        session: AsyncSession,
+        tgd_uid: str,
+        cookie: str,
+    ):
+        """更新同一账号下所有记录的 cookie"""
+        sql = select(cls).where(cls.tgd_uid == tgd_uid)
+        result = await session.execute(sql)
+        for user in result.scalars().all():
+            user.cookie = cookie
+
 
 class TGDSignData(PydanticBaseModel):
     uid: str

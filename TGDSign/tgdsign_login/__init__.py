@@ -176,35 +176,39 @@ async def page_login(bot: Bot, ev: Event):
                     str(r.get("gameId", GAMEID)),
                 ))
 
-    # 主角色用于存储
+    # 每个角色一条 TGDUser 记录，没有角色则 uid=tgd_uid
     if all_roles:
-        primary_id, primary_name, primary_game_id = all_roles[0]
-        store_uid = primary_id
+        for role_id, rname, gid in all_roles:
+            await TGDBind.insert_uid(
+                ev.user_id, ev.bot_id, role_id, ev.group_id, is_digit=False
+            )
+            await TGDUser.insert_data(
+                ev.user_id, ev.bot_id,
+                cookie=refresh_token,
+                uid=role_id,
+                tgd_uid=tgd_uid,
+                device_id=device_id,
+                role_name=rname,
+                game_id=gid,
+                sign_switch="off",
+            )
     else:
-        store_uid = tgd_uid
-        primary_name = ""
-        primary_game_id = GAMEID
+        await TGDBind.insert_uid(
+            ev.user_id, ev.bot_id, tgd_uid, ev.group_id, is_digit=False
+        )
+        await TGDUser.insert_data(
+            ev.user_id, ev.bot_id,
+            cookie=refresh_token,
+            uid=tgd_uid,
+            tgd_uid=tgd_uid,
+            device_id=device_id,
+            role_name="",
+            game_id=GAMEID,
+            sign_switch="off",
+        )
 
-    # 保存绑定数据
-    await TGDBind.insert_uid(
-        ev.user_id, ev.bot_id, store_uid, ev.group_id, is_digit=False
-    )
-
-    # 保存用户数据
-    await TGDUser.insert_data(
-        ev.user_id,
-        ev.bot_id,
-        cookie=refresh_token,
-        uid=store_uid,
-        tgd_uid=tgd_uid,
-        device_id=device_id,
-        role_name=primary_name,
-        game_id=primary_game_id,
-        sign_switch="off",
-    )
-
-    display_name = primary_name or tgd_uid
-    role_names = [r[1] for r in all_roles] if all_roles else []
+    role_names = [r[1] for r in all_roles]
+    display_name = role_names[0] if role_names else tgd_uid
     logger.info(
         f"[TGDSign] 用户 {ev.user_id} 登录成功: "
         f"tgd_uid={tgd_uid}, roles={role_names}"
@@ -218,6 +222,7 @@ async def page_login(bot: Bot, ev: Event):
         sign_msgs.append(f"绑定角色: {'、'.join(role_names)}")
 
     # APP签到
+    primary_uid = all_roles[0][0] if all_roles else tgd_uid
     res = await tgd_api.app_signin(
         access_token=access_token, uid=tgd_uid, device_id=device_id
     )
@@ -225,18 +230,20 @@ async def page_login(bot: Bot, ev: Event):
         exp = res["data"].get("exp", 0)
         gold_coin = res["data"].get("goldCoin", 0)
         sign_msgs.append(f"APP签到成功，获得{exp}经验，{gold_coin}金币")
-        await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(store_uid))
+        await TGDSignRecord.upsert_sign(
+            TGDSignData.build_app_sign(primary_uid)
+        )
     else:
         msg = res["message"]
-        if "已经签到" in msg or "签到过" in msg:
+        if "已经签到" in msg or "签到过" in msg or "重复签到" in msg:
             sign_msgs.append("APP今日已签到")
             await TGDSignRecord.upsert_sign(
-                TGDSignData.build_app_sign(store_uid)
+                TGDSignData.build_app_sign(primary_uid)
             )
         else:
             sign_msgs.append(f"APP签到失败: {msg}")
 
-    # 游戏签到（所有角色）
+    # 游戏签到（每个角色）
     if all_roles:
         signin_state = await tgd_api.get_signin_state(
             access_token=access_token
@@ -245,13 +252,10 @@ async def page_login(bot: Bot, ev: Event):
             access_token=access_token
         )
 
-        multi = len(all_roles) > 1
-        all_success = True
         for role_id, rname, _ in all_roles:
             res = await tgd_api.game_signin(
                 access_token=access_token, role_id=role_id
             )
-            rdisplay = rname or role_id
             if res["status"]:
                 reward_msg = "游戏签到成功"
                 if signin_state["status"] and signin_rewards["status"]:
@@ -259,38 +263,23 @@ async def page_login(bot: Bot, ev: Event):
                         days = signin_state["data"]["days"]
                         reward = signin_rewards["data"][days]
                         reward_msg = (
-                            f"游戏签到成功，"
                             f"获得{reward['name']}*{reward['num']}"
                         )
                     except (KeyError, IndexError, TypeError):
                         pass
-                if multi:
-                    sign_msgs.append(f"[{rdisplay}] {reward_msg}")
-                else:
-                    sign_msgs.append(reward_msg)
+                sign_msgs.append(f"{rname} {reward_msg}")
                 await TGDSignRecord.upsert_sign(
                     TGDSignData.build_game_sign(role_id)
                 )
             else:
                 msg = res["message"]
-                if "已经签到" in msg or "签到过" in msg:
-                    if multi:
-                        sign_msgs.append(
-                            f"[{rdisplay}] 游戏今日已签到"
-                        )
-                    else:
-                        sign_msgs.append("游戏今日已签到")
+                if "已经签到" in msg or "签到过" in msg or "重复签到" in msg:
+                    sign_msgs.append(f"{rname} 今日已签到")
                     await TGDSignRecord.upsert_sign(
                         TGDSignData.build_game_sign(role_id)
                     )
                 else:
-                    if multi:
-                        sign_msgs.append(
-                            f"[{rdisplay}] 游戏签到失败: {msg}"
-                        )
-                    else:
-                        sign_msgs.append(f"游戏签到失败: {msg}")
-                    all_success = False
+                    sign_msgs.append(f"{rname} 游戏签到失败: {msg}")
 
     sign_msgs.append("发 tgd开启自动签到 以开启每日自动签到")
     return await bot.send("\n".join(sign_msgs), at_sender=at_sender)
