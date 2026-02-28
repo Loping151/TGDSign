@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TGDSign 登录</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0F172A;
+      color: #F1F5F9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    }
+
+    .header {
+      margin-bottom: 1.75rem;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #F1F5F9;
+      margin-bottom: 0.35rem;
+    }
+
+    .header .sub {
+      font-size: 1rem;
+      color: #94A3B8;
+    }
+
+    .uid-tag {
+      display: inline-block;
+      background: #334155;
+      color: #F59E0B;
+      font-size: 0.875rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      margin-top: 0.6rem;
+    }
+
+    .field { margin-bottom: 1.25rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #94A3B8;
+      margin-bottom: 0.5rem;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: #0F172A;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #F1F5F9;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+
+    .field input:focus { border-color: #3B82F6; }
+    .field input::placeholder { color: #475569; }
+
+    .code-row {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    .code-row input { flex: 1; min-width: 0; }
+
+    .btn {
+      padding: 0.75rem 1.1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: #F1F5F9;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-secondary:hover { background: #475569; }
+    .btn-secondary:disabled { background: #1E293B; color: #475569; cursor: not-allowed; }
+
+    .btn-primary {
+      width: 100%;
+      background: #2563EB;
+      color: #fff;
+      padding: 0.85rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+
+    .btn-primary:hover { background: #1D4ED8; }
+    .btn-primary:disabled { background: #1E293B; color: #475569; cursor: not-allowed; }
+
+    .msg {
+      margin-top: 1rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      display: none;
+    }
+
+    .msg.ok { display: block; background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; }
+    .msg.err { display: block; background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>TGDSign 塔吉多登录</h1>
+    <div class="sub">短信验证码登录</div>
+    <div class="uid-tag">账号: {{ userId }}</div>
+  </div>
+
+  <form id="loginForm">
+    <div class="field">
+      <label for="phone">手机号</label>
+      <input type="tel" id="phone" inputmode="numeric" maxlength="11" placeholder="请输入11位手机号" required>
+    </div>
+
+    <div class="field">
+      <label>验证码</label>
+      <div class="code-row">
+        <input type="text" id="code" inputmode="numeric" maxlength="6" placeholder="6位验证码" required>
+        <button type="button" id="sendBtn" class="btn btn-secondary" disabled>发送验证码</button>
+      </div>
+    </div>
+
+    <button type="submit" id="loginBtn" class="btn btn-primary" disabled>登录</button>
+  </form>
+
+  <div id="msg" class="msg"></div>
+
+  <div class="footer">请勿使用他人链接 · 3分钟内有效</div>
+</div>
+
+<script>
+const phone = document.getElementById('phone');
+const code = document.getElementById('code');
+const sendBtn = document.getElementById('sendBtn');
+const loginBtn = document.getElementById('loginBtn');
+const msgEl = document.getElementById('msg');
+const AUTH = '{{ auth }}';
+const SERVER = '{{ server_url }}';
+
+function showMsg(text, ok) {
+  msgEl.textContent = text;
+  msgEl.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+phone.addEventListener('input', () => {
+  sendBtn.disabled = phone.value.length !== 11;
+  loginBtn.disabled = phone.value.length !== 11 || code.value.length < 4;
+});
+
+code.addEventListener('input', () => {
+  loginBtn.disabled = phone.value.length !== 11 || code.value.length < 4;
+});
+
+sendBtn.addEventListener('click', async () => {
+  sendBtn.disabled = true;
+  let cd = 60;
+  const orig = sendBtn.textContent;
+
+  try {
+    const r = await fetch(SERVER + '/tgd/sendcode', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({auth: AUTH, phone: phone.value})
+    });
+    const d = await r.json();
+    if (d.success) {
+      showMsg('验证码已发送', true);
+      const t = setInterval(() => {
+        sendBtn.textContent = cd + 's';
+        if (--cd < 0) { clearInterval(t); sendBtn.textContent = orig; sendBtn.disabled = false; }
+      }, 1000);
+    } else {
+      showMsg(d.msg || '发送失败', false);
+      sendBtn.disabled = false;
+    }
+  } catch {
+    showMsg('网络错误', false);
+    sendBtn.disabled = false;
+  }
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginBtn.disabled = true;
+
+  try {
+    const r = await fetch(SERVER + '/tgd/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({auth: AUTH, mobile: phone.value, code: code.value})
+    });
+    const d = await r.json();
+    if (d.success) {
+      showMsg('登录成功！请返回聊天查看结果', true);
+      loginBtn.textContent = '已完成';
+    } else {
+      showMsg(d.msg || '登录失败', false);
+      loginBtn.disabled = false;
+    }
+  } catch {
+    showMsg('网络错误', false);
+    loginBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
