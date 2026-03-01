@@ -37,10 +37,18 @@ async def _do_sign_for_account(
     )
     if not res["status"]:
         display = primary.role_name or tgd_uid
+        if res.get("token_expired"):
+            await TGDUser.set_token_valid_by_cookie(primary.cookie, valid=False)
+            logger.warning(f"[TGDSign] 账号 {tgd_uid} token已失效, 已标记为无效")
         return f"[{display}] Token已过期: {res['message']}，请重新登录"
 
     access_token = res["data"]["accessToken"]
     new_refresh_token = res["data"]["refreshToken"]
+
+    # 刷新成功, 确保标记为有效
+    if primary.token_valid == "invalid":
+        await TGDUser.set_token_valid_by_cookie(primary.cookie, valid=True)
+        logger.info(f"[TGDSign] 账号 {tgd_uid} token已恢复有效")
 
     # 更新同账号所有记录的 cookie
     await TGDUser.update_cookie_by_tgd_uid(

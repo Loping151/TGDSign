@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Type, TypeVar, Optional
 from datetime import datetime
 
 from sqlmodel import Field, select
-from sqlalchemy import delete, update
+from sqlalchemy import delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel as PydanticBaseModel
 from gsuid_core.utils.database.base_models import (
@@ -19,6 +19,7 @@ from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
 exec_list.extend(
     [
         'ALTER TABLE TGDUser ADD COLUMN game_id TEXT DEFAULT "1256"',
+        'ALTER TABLE TGDUser ADD COLUMN token_valid TEXT DEFAULT ""',
     ]
 )
 
@@ -44,6 +45,57 @@ class TGDUser(User, table=True):
     device_id: str = Field(default="", title="设备ID")
     role_name: str = Field(default="", title="角色名")
     game_id: str = Field(default="1256", title="游戏ID")
+    token_valid: str = Field(default="", title="Token有效性")
+
+    @classmethod
+    @with_session
+    async def insert_data(
+        cls: Type[T_TGDUser],
+        session: AsyncSession,
+        user_id: str,
+        bot_id: str,
+        **data,
+    ) -> int:
+        """覆写基类方法, 按 (user_id, bot_id, uid) 查重/更新,
+        并在写入有角色ID的记录后清理同tgd_uid下角色ID为空的记录"""
+        uid = data.get("uid", "")
+        tgd_uid = data.get("tgd_uid", "")
+
+        # 按 (user_id, bot_id, uid) 精确查重
+        stmt = select(cls).where(
+            cls.user_id == user_id,
+            cls.bot_id == bot_id,
+            cls.uid == uid,
+        )
+        result = await session.execute(stmt)
+        existing = result.scalars().first()
+
+        if existing:
+            stmt = (
+                update(cls)
+                .where(
+                    cls.user_id == user_id,
+                    cls.bot_id == bot_id,
+                    cls.uid == uid,
+                )
+                .values(**data)
+                .execution_options(synchronize_session="fetch")
+            )
+            await session.execute(stmt)
+        else:
+            session.add(cls(user_id=user_id, bot_id=bot_id, **data))
+
+        # 成功写入具有角色ID的记录后, 删除同账号同tgd_uid下角色ID为空的记录
+        if uid and tgd_uid and uid != tgd_uid:
+            cleanup = delete(cls).where(
+                cls.user_id == user_id,
+                cls.bot_id == bot_id,
+                cls.tgd_uid == tgd_uid,
+                or_(cls.uid == "", cls.uid == tgd_uid),
+            )
+            await session.execute(cleanup)
+
+        return 0
 
     @classmethod
     @with_session
@@ -99,11 +151,12 @@ class TGDUser(User, table=True):
         cls: Type[T_TGDUser],
         session: AsyncSession,
     ) -> List[T_TGDUser]:
-        """获取所有有 refresh_token 的用户"""
+        """获取所有有 refresh_token 且 token 有效的用户"""
         sql = (
             select(cls)
             .where(cls.cookie != "")
             .where(cls.user_id != "")
+            .where(cls.token_valid != "invalid")
         )
         result = await session.execute(sql)
         return list(result.scalars().all())
@@ -114,12 +167,13 @@ class TGDUser(User, table=True):
         cls: Type[T_TGDUser],
         session: AsyncSession,
     ) -> List[T_TGDUser]:
-        """获取开启自动签到的用户"""
+        """获取开启自动签到且 token 有效的用户"""
         sql = (
             select(cls)
             .where(cls.cookie != "")
             .where(cls.user_id != "")
             .where(cls.sign_switch != "off")
+            .where(cls.token_valid != "invalid")
         )
         result = await session.execute(sql)
         return list(result.scalars().all())
@@ -137,6 +191,23 @@ class TGDUser(User, table=True):
             update(cls)
             .where(cls.tgd_uid == tgd_uid)
             .values(cookie=cookie)
+        )
+        sql = sql.execution_options(synchronize_session="fetch")
+        await session.execute(sql)
+
+    @classmethod
+    @with_session
+    async def set_token_valid_by_cookie(
+        cls: Type[T_TGDUser],
+        session: AsyncSession,
+        cookie: str,
+        valid: bool,
+    ):
+        """通过 cookie(refresh_token) 值查找并设置 token 有效性"""
+        sql = (
+            update(cls)
+            .where(cls.cookie == cookie)
+            .values(token_valid="" if valid else "invalid")
         )
         sql = sql.execution_options(synchronize_session="fetch")
         await session.execute(sql)

@@ -250,7 +250,11 @@ class TaygedoApi:
                     f"[TGDSign] 刷新token空响应: "
                     f"status={response.status_code}"
                 )
-                return {"status": False, "message": "刷新token返回空响应"}
+                return {
+                    "status": False,
+                    "message": "刷新token返回空响应",
+                    "token_expired": response.status_code == 402,
+                }
             resp = response.json()
             logger.debug(f"[TGDSign] 刷新token响应: {resp}")
             if (

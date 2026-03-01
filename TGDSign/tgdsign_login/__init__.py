@@ -191,6 +191,7 @@ async def page_login(bot: Bot, ev: Event):
                 role_name=rname,
                 game_id=gid,
                 sign_switch="off",
+                token_valid="",
             )
     else:
         await TGDBind.insert_uid(
@@ -205,6 +206,7 @@ async def page_login(bot: Bot, ev: Event):
             role_name="",
             game_id=GAMEID,
             sign_switch="off",
+            token_valid="",
         )
 
     role_names = [r[1] for r in all_roles]
