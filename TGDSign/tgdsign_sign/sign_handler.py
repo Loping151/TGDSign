@@ -61,7 +61,7 @@ async def _do_sign_for_account(
 
     msg_parts: list[str] = []
 
-    # APP签到 (一个账号只签一次, 用第一条记录追踪)
+    # 社区签到 (一个账号只签一次, 用第一条记录追踪)
     uid = primary.uid
     sign_record = await TGDSignRecord.get_sign_data(uid)
     if not sign_record or sign_record.app_sign < 1:
@@ -73,19 +73,19 @@ async def _do_sign_for_account(
         if res["status"]:
             exp = res["data"].get("exp", 0)
             gold_coin = res["data"].get("goldCoin", 0)
-            msg_parts.append(f"APP签到成功，获得{exp}经验，{gold_coin}金币")
+            msg_parts.append(f"社区签到成功，获得{exp}经验，{gold_coin}金币")
             await TGDSignRecord.upsert_sign(TGDSignData.build_app_sign(uid))
         else:
             msg = res["message"]
             if "已经签到" in msg or "签到过" in msg or "重复签到" in msg:
-                msg_parts.append("APP今日已签到")
+                msg_parts.append("社区今日已签到")
                 await TGDSignRecord.upsert_sign(
                     TGDSignData.build_app_sign(uid)
                 )
             else:
-                msg_parts.append(f"APP签到失败: {msg}")
+                msg_parts.append(f"社区签到失败: {msg}")
     else:
-        msg_parts.append("APP今日已签到")
+        msg_parts.append("社区今日已签到")
 
     # 游戏签到 (每个角色)
     role_users = [u for u in tgd_users if u.uid != u.tgd_uid]
