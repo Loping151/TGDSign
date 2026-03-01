@@ -9,7 +9,7 @@ from gsuid_core.subscribe import gs_subscribe
 from .tgdsign_config import TGDSignConfig
 from ..utils.database.models import TGDBind, TGDUser
 
-SIGN_RESULT_TYPE = "订阅签到结果"
+SIGN_RESULT_TYPE = "订阅塔吉多签到结果"
 
 sv_tgd_config = SV("TGDSign-配置")
 
