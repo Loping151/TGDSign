@@ -53,7 +53,7 @@ logger.info(
 
 # 每日清理2天前的签到记录
 @scheduler.scheduled_job("cron", hour=0, minute=5, id="tgd_clear_sign")
-async def clear_sign_record():
+async def clear_tgd_sign_record():
     two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
     await TGDSignRecord.clear_sign_record(two_days_ago)
     logger.info("[TGDSign] 已清除2天前的签到记录")
