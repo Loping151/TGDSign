@@ -3,172 +3,500 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TGDSign 登录</title>
+  <title>TGD // 塔吉多登录</title>
+  <link rel="preconnect" href="https://fonts.loli.net">
+  <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
+  <link href="https://fonts.loli.net/css2?family=Bungee&family=Permanent+Marker&family=Bungee+Shade&family=Zen+Dots&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: #0F172A;
-      color: #F1F5F9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 1rem;
+    :root{
+      --ink: #0a0510;
+      --wall: #130723;
+      --concrete: #1d1129;
+      --hot: #ff2e9a;
+      --rose: #ff6bc1;
+      --violet: #7b2dff;
+      --grape: #b91372;
+      --cyan: #3df5ff;
+      --lemon: #f6ff4a;
+      --chalk: #fff2fb;
+      --smoke: #bfb0c9;
     }
 
-    .card {
-      background: #1E293B;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 420px;
-      padding: 2rem 1.5rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+    html,body{height:100%}
+
+    body{
+      min-height:100vh;
+      font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+      color:var(--chalk);
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #2a0a3a 0%, transparent 60%),
+        radial-gradient(900px 700px at 110% 10%, #420a5f 0%, transparent 55%),
+        radial-gradient(800px 700px at 80% 110%, #7c0a4a 0%, transparent 60%),
+        linear-gradient(180deg,#0a0510 0%,#120522 100%);
+      overflow-x:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:1.2rem;
+      position:relative;
+      -webkit-font-smoothing:antialiased;
     }
 
-    .header {
-      margin-bottom: 1.75rem;
-      text-align: center;
+    /* 混凝土噪点 */
+    body::before{
+      content:"";
+      position:fixed;inset:0;
+      background-image:
+        radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        radial-gradient(rgba(255,46,154,.04) 1px, transparent 1px);
+      background-size: 3px 3px, 7px 7px;
+      background-position: 0 0, 1px 2px;
+      pointer-events:none;
+      mix-blend-mode:screen;
+      z-index:1;
     }
 
-    .header h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: #F1F5F9;
-      margin-bottom: 0.35rem;
+    /* 粗糙划痕 */
+    body::after{
+      content:"";
+      position:fixed;inset:0;
+      background:
+        repeating-linear-gradient(97deg, transparent 0 80px, rgba(255,255,255,.015) 80px 81px),
+        repeating-linear-gradient(-3deg, transparent 0 140px, rgba(255,46,154,.025) 140px 141px);
+      pointer-events:none;
+      z-index:1;
     }
 
-    .header .sub {
-      font-size: 1rem;
-      color: #94A3B8;
+    /* 涂鸦背景层 */
+    .graffiti-bg{
+      position:fixed;inset:0;
+      pointer-events:none;
+      z-index:0;
+      overflow:hidden;
+    }
+    .graffiti-bg svg{position:absolute}
+
+    .tag{
+      position:absolute;
+      font-family:"Permanent Marker",cursive;
+      color:transparent;
+      -webkit-text-stroke:2px rgba(255,46,154,.18);
+      font-size:11rem;
+      letter-spacing:-.04em;
+      transform:rotate(-9deg);
+      user-select:none;
+      line-height:.85;
+    }
+    .tag.t1{top:-4rem;left:-3rem;font-size:14rem;-webkit-text-stroke-color:rgba(123,45,255,.22)}
+    .tag.t2{bottom:-6rem;right:-4rem;font-size:15rem;transform:rotate(7deg);-webkit-text-stroke-color:rgba(255,46,154,.16)}
+    .tag.t3{top:40%;right:-2rem;font-size:9rem;transform:rotate(90deg);-webkit-text-stroke-color:rgba(61,245,255,.14);-webkit-text-stroke-width:1.5px}
+
+    .drip{
+      position:absolute;
+      width:6px;
+      background:var(--hot);
+      border-radius:0 0 50% 50%/0 0 40% 40%;
+      filter:drop-shadow(0 0 8px rgba(255,46,154,.6));
+      opacity:.55;
     }
 
-    .uid-tag {
-      display: inline-block;
-      background: #334155;
-      color: #F59E0B;
-      font-size: 0.875rem;
-      padding: 0.25rem 0.75rem;
-      border-radius: 4px;
-      margin-top: 0.6rem;
+    /* 容器 */
+    .stage{
+      position:relative;
+      z-index:2;
+      width:100%;
+      max-width:440px;
     }
 
-    .field { margin-bottom: 1.25rem; }
-
-    .field label {
-      display: block;
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: #94A3B8;
-      margin-bottom: 0.5rem;
+    .stage::before{
+      content:"";
+      position:absolute;
+      inset:-24px -28px -28px -22px;
+      border:2px dashed rgba(255,46,154,.45);
+      border-radius:6px;
+      transform:rotate(-1.2deg);
+      pointer-events:none;
     }
 
-    .field input {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: #0F172A;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      color: #F1F5F9;
-      font-size: 1rem;
-      outline: none;
-      transition: border-color 0.2s;
-      -webkit-appearance: none;
+    /* 卡片：海报 */
+    .card{
+      position:relative;
+      background:
+        linear-gradient(160deg, rgba(255,46,154,.06), rgba(123,45,255,.04)),
+        var(--wall);
+      border:1px solid rgba(255,46,154,.35);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.03) inset,
+        0 30px 60px -20px rgba(255,46,154,.25),
+        0 0 0 6px rgba(10,5,16,.8),
+        0 0 0 7px rgba(255,46,154,.5);
+      padding:2.4rem 1.7rem 1.9rem;
+      transform:rotate(.6deg);
     }
 
-    .field input:focus { border-color: #3B82F6; }
-    .field input::placeholder { color: #475569; }
+    /* 胶带 */
+    .tape{
+      position:absolute;
+      width:92px;height:28px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.06) 20%, rgba(255,255,255,.18) 45%, rgba(255,255,255,.06) 70%, rgba(255,255,255,.16)),
+        rgba(246,255,74,.72);
+      box-shadow:0 6px 14px rgba(0,0,0,.5);
+    }
+    .tape.tl{top:-14px;left:-16px;transform:rotate(-14deg)}
+    .tape.tr{top:-12px;right:-18px;transform:rotate(11deg);background:linear-gradient(90deg,rgba(255,255,255,.18),rgba(255,255,255,.06) 20%,rgba(255,255,255,.18) 45%,rgba(255,255,255,.06) 70%,rgba(255,255,255,.16)),rgba(61,245,255,.66)}
 
-    .code-row {
-      display: flex;
-      gap: 0.6rem;
+    /* 标题组 */
+    .brand{
+      position:relative;
+      margin-bottom:1.6rem;
     }
 
-    .code-row input { flex: 1; min-width: 0; }
-
-    .btn {
-      padding: 0.75rem 1.1rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      -webkit-tap-highlight-color: transparent;
+    .brand .kicker{
+      font-family:"Bungee",sans-serif;
+      font-size:.72rem;
+      letter-spacing:.38em;
+      color:var(--cyan);
+      opacity:.85;
+      margin-bottom:.25rem;
+      display:flex;align-items:center;gap:.55rem;
+    }
+    .brand .kicker::before,.brand .kicker::after{
+      content:"";flex:1;height:2px;
+      background:repeating-linear-gradient(90deg, var(--cyan) 0 4px, transparent 4px 8px);
+      opacity:.6;
     }
 
-    .btn-secondary {
-      background: #334155;
-      color: #F1F5F9;
-      white-space: nowrap;
-      flex-shrink: 0;
+    .brand h1{
+      font-family:"Bungee Shade","Bungee",sans-serif;
+      font-size:3.2rem;
+      line-height:.86;
+      color:var(--chalk);
+      letter-spacing:-.02em;
+      text-shadow:
+        4px 4px 0 var(--hot),
+        8px 8px 0 var(--violet),
+        12px 12px 30px rgba(0,0,0,.6);
+      transform:skew(-4deg);
+      margin-left:-2px;
+      position:relative;
     }
 
-    .btn-secondary:hover { background: #475569; }
-    .btn-secondary:disabled { background: #1E293B; color: #475569; cursor: not-allowed; }
-
-    .btn-primary {
-      width: 100%;
-      background: #2563EB;
-      color: #fff;
-      padding: 0.85rem;
-      font-size: 1.05rem;
-      font-weight: 600;
-      margin-top: 0.5rem;
+    .brand h1 .slash{
+      color:var(--hot);
+      font-family:"Bungee",sans-serif;
+      display:inline-block;
+      transform:translateY(-6px) rotate(8deg);
+      margin:0 .15em;
     }
 
-    .btn-primary:hover { background: #1D4ED8; }
-    .btn-primary:disabled { background: #1E293B; color: #475569; cursor: not-allowed; }
-
-    .msg {
-      margin-top: 1rem;
-      padding: 0.65rem 0.85rem;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      display: none;
+    .brand .sub{
+      font-family:"Permanent Marker",cursive;
+      color:var(--rose);
+      font-size:1.25rem;
+      transform:rotate(-2deg);
+      margin-top:.7rem;
+      display:inline-block;
+      padding:.1rem .45rem;
+      background:rgba(255,46,154,.14);
+      border-left:3px solid var(--hot);
     }
 
-    .msg.ok { display: block; background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; }
-    .msg.err { display: block; background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; }
+    .brand .sub::before{content:"「 "}
+    .brand .sub::after{content:" 」"}
 
-    .footer {
-      text-align: center;
-      margin-top: 1.25rem;
-      font-size: 0.85rem;
-      color: #475569;
+    /* UID 印章 */
+    .stamp{
+      position:absolute;
+      top:.2rem;right:-6px;
+      font-family:"Bungee",sans-serif;
+      font-size:.7rem;
+      letter-spacing:.15em;
+      color:var(--hot);
+      border:2px solid var(--hot);
+      padding:.3rem .55rem;
+      transform:rotate(8deg);
+      background:rgba(10,5,16,.7);
+      box-shadow:0 0 0 3px rgba(10,5,16,.85), 0 0 14px rgba(255,46,154,.35) inset;
+    }
+    .stamp::before{
+      content:"UID";
+      display:block;
+      font-size:.55rem;
+      letter-spacing:.28em;
+      color:var(--cyan);
+      margin-bottom:.1rem;
+    }
+
+    /* 分区标签 */
+    .section-label{
+      display:inline-block;
+      font-family:"Bungee",sans-serif;
+      font-size:.72rem;
+      letter-spacing:.22em;
+      color:var(--ink);
+      background:var(--lemon);
+      padding:.25rem .6rem .22rem;
+      margin-bottom:.55rem;
+      transform:rotate(-1.5deg);
+      box-shadow:3px 3px 0 var(--hot);
+    }
+
+    /* 表单 */
+    .field{margin-bottom:1.25rem;position:relative}
+
+    .field input{
+      width:100%;
+      padding:.9rem 1rem;
+      font-family:"Zen Dots",monospace;
+      font-size:1.05rem;
+      letter-spacing:.06em;
+      color:var(--chalk);
+      background:rgba(10,5,16,.6);
+      border:2px solid rgba(255,46,154,.25);
+      outline:none;
+      -webkit-appearance:none;
+      border-radius:0;
+      transition:all .2s;
+      caret-color:var(--cyan);
+    }
+    .field input::placeholder{
+      color:rgba(191,176,201,.35);
+      font-family:"Noto Sans SC",sans-serif;
+      letter-spacing:0;
+      font-size:.95rem;
+    }
+    .field input:focus{
+      border-color:var(--hot);
+      box-shadow:
+        -4px 4px 0 var(--violet),
+        0 0 0 1px var(--hot) inset,
+        0 0 30px rgba(255,46,154,.18);
+      transform:translate(2px,-2px);
+    }
+
+    .code-row{display:flex;gap:.55rem}
+    .code-row input{flex:1;min-width:0}
+
+    /* 按钮：模板喷绘 */
+    .btn{
+      border:none;
+      cursor:pointer;
+      font-family:"Bungee",sans-serif;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      padding:.75rem 1rem;
+      position:relative;
+      transition:transform .15s, box-shadow .15s;
+      -webkit-tap-highlight-color:transparent;
+      border-radius:0;
+    }
+
+    .btn-send{
+      background:var(--ink);
+      color:var(--cyan);
+      border:2px solid var(--cyan);
+      font-size:.78rem;
+      white-space:nowrap;
+      box-shadow:3px 3px 0 var(--violet);
+      flex-shrink:0;
+    }
+    .btn-send:hover:not(:disabled){
+      transform:translate(-2px,-2px);
+      box-shadow:5px 5px 0 var(--violet),0 0 20px rgba(61,245,255,.4);
+    }
+    .btn-send:active:not(:disabled){transform:translate(2px,2px);box-shadow:1px 1px 0 var(--violet)}
+    .btn-send:disabled{
+      opacity:.35;cursor:not-allowed;
+      color:var(--smoke);border-color:var(--smoke);
+      box-shadow:3px 3px 0 #3a2a4a;
+    }
+
+    .btn-go{
+      width:100%;
+      margin-top:.6rem;
+      padding:1.1rem;
+      font-size:1.15rem;
+      color:var(--ink);
+      background:
+        linear-gradient(135deg,var(--hot) 0%,var(--rose) 55%,var(--violet) 100%);
+      box-shadow:
+        6px 6px 0 var(--ink),
+        6px 6px 0 2px var(--cyan),
+        inset 0 0 0 2px rgba(255,255,255,.5);
+      position:relative;
+      overflow:hidden;
+    }
+    .btn-go::before{
+      content:"";
+      position:absolute;inset:0;
+      background:
+        radial-gradient(circle at 20% 110%, rgba(255,255,255,.4), transparent 40%),
+        radial-gradient(circle at 85% -20%, rgba(61,245,255,.35), transparent 50%);
+      mix-blend-mode:overlay;
+      pointer-events:none;
+    }
+    .btn-go:hover:not(:disabled){
+      transform:translate(-3px,-3px);
+      box-shadow:9px 9px 0 var(--ink),9px 9px 0 2px var(--cyan),inset 0 0 0 2px rgba(255,255,255,.5);
+    }
+    .btn-go:active:not(:disabled){transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink),2px 2px 0 2px var(--cyan),inset 0 0 0 2px rgba(255,255,255,.5)}
+    .btn-go:disabled{
+      cursor:not-allowed;
+      background:#2a1b38;color:#5a4a6a;
+      box-shadow:6px 6px 0 var(--ink);
+    }
+
+    /* 消息 */
+    .msg{
+      margin-top:1rem;
+      padding:.7rem .85rem;
+      font-family:"Permanent Marker",cursive;
+      font-size:1rem;
+      letter-spacing:.02em;
+      display:none;
+      position:relative;
+      transform:rotate(-.8deg);
+    }
+    .msg.ok{display:block;background:rgba(61,245,255,.12);color:var(--cyan);border-left:4px solid var(--cyan)}
+    .msg.ok::before{content:"✓ ";font-weight:bold}
+    .msg.err{display:block;background:rgba(255,46,154,.16);color:var(--rose);border-left:4px solid var(--hot)}
+    .msg.err::before{content:"✗ ";font-weight:bold}
+
+    /* 底栏 */
+    .footer{
+      margin-top:1.4rem;
+      font-family:"Permanent Marker",cursive;
+      font-size:.82rem;
+      color:var(--smoke);
+      text-align:center;
+      letter-spacing:.04em;
+      display:flex;align-items:center;gap:.6rem;justify-content:center;
+      transform:rotate(.5deg);
+    }
+    .footer::before,.footer::after{
+      content:"";flex:0 0 28px;height:2px;
+      background:linear-gradient(90deg,transparent,var(--hot),transparent);
+    }
+
+    /* 登录 token 标记 */
+    .byline{
+      position:absolute;
+      bottom:-14px;right:-8px;
+      font-family:"Zen Dots",monospace;
+      font-size:.58rem;
+      letter-spacing:.2em;
+      color:var(--violet);
+      background:var(--ink);
+      padding:.25rem .5rem;
+      border:1px solid rgba(123,45,255,.6);
+      transform:rotate(-2deg);
+    }
+
+    /* 入场动画 */
+    @keyframes spray-in{
+      0%{opacity:0;transform:rotate(.6deg) translateY(22px) scale(.96);filter:blur(8px)}
+      60%{opacity:1;filter:blur(0)}
+      100%{opacity:1;transform:rotate(.6deg) translateY(0) scale(1);filter:blur(0)}
+    }
+    @keyframes drip-fall{
+      0%{height:0;opacity:0}
+      20%{opacity:.6}
+      100%{height:var(--h,40px);opacity:0}
+    }
+    @keyframes flicker{
+      0%,100%{opacity:.85;filter:drop-shadow(0 0 6px var(--hot))}
+      50%{opacity:1;filter:drop-shadow(0 0 16px var(--hot))}
+    }
+    @keyframes tag-float{
+      0%,100%{transform:var(--tf,rotate(-9deg)) translateY(0)}
+      50%{transform:var(--tf,rotate(-9deg)) translateY(-10px)}
+    }
+
+    .card{animation:spray-in .9s cubic-bezier(.2,.8,.2,1) both}
+    .brand h1{animation:flicker 3.4s ease-in-out infinite}
+    .tag{animation:tag-float 9s ease-in-out infinite}
+    .tag.t2{animation-delay:-3s;--tf:rotate(7deg)}
+    .tag.t3{animation-delay:-6s;--tf:rotate(90deg)}
+
+    @media (max-width:420px){
+      .brand h1{font-size:2.5rem}
+      .stage::before{inset:-16px -18px -18px -14px}
+      .card{padding:2rem 1.3rem 1.6rem}
     }
   </style>
 </head>
 <body>
-<div class="card">
-  <div class="header">
-    <h1>TGDSign 塔吉多登录</h1>
-    <div class="sub">短信验证码登录</div>
-    <div class="uid-tag">账号: {{ userId }}</div>
-  </div>
 
-  <form id="loginForm">
-    <div class="field">
-      <label for="phone">手机号</label>
-      <input type="tel" id="phone" inputmode="numeric" maxlength="11" placeholder="请输入11位手机号" required>
+<!-- 涂鸦背景层 -->
+<div class="graffiti-bg" aria-hidden="true">
+  <div class="tag t1">TGD</div>
+  <div class="tag t2">SIGN</div>
+  <div class="tag t3">塔吉多</div>
+
+  <!-- 散落的喷点 -->
+  <svg width="220" height="220" style="top:8%;left:6%;opacity:.35" viewBox="0 0 220 220">
+    <g fill="#ff2e9a">
+      <circle cx="40" cy="30" r="2.5"/><circle cx="70" cy="18" r="1.5"/><circle cx="22" cy="62" r="1.5"/>
+      <circle cx="120" cy="40" r="2"/><circle cx="165" cy="75" r="1.2"/><circle cx="92" cy="88" r="1.7"/>
+      <circle cx="180" cy="140" r="2.2"/><circle cx="148" cy="180" r="1.4"/><circle cx="70" cy="200" r="1.8"/>
+      <circle cx="38" cy="170" r="1.3"/><circle cx="115" cy="150" r="1"/><circle cx="198" cy="30" r="1.6"/>
+    </g>
+  </svg>
+  <svg width="260" height="260" style="top:55%;right:4%;opacity:.3" viewBox="0 0 260 260">
+    <g fill="#7b2dff">
+      <circle cx="30" cy="40" r="2.8"/><circle cx="80" cy="28" r="1.4"/><circle cx="180" cy="60" r="2"/>
+      <circle cx="220" cy="120" r="1.6"/><circle cx="130" cy="100" r="2.4"/><circle cx="60" cy="160" r="1.8"/>
+      <circle cx="210" cy="200" r="1.5"/><circle cx="160" cy="240" r="2"/><circle cx="40" cy="230" r="1.3"/>
+    </g>
+  </svg>
+
+  <!-- 喷漆弧线 -->
+  <svg width="320" height="180" style="top:10%;right:-40px;opacity:.18" viewBox="0 0 320 180">
+    <path d="M10,90 Q80,10 160,90 T310,90" stroke="#ff2e9a" stroke-width="3" fill="none" stroke-dasharray="1 6" stroke-linecap="round"/>
+  </svg>
+  <svg width="360" height="160" style="bottom:6%;left:-30px;opacity:.18" viewBox="0 0 360 160">
+    <path d="M10,80 Q90,150 170,80 T350,80" stroke="#3df5ff" stroke-width="3" fill="none" stroke-dasharray="2 8" stroke-linecap="round"/>
+  </svg>
+</div>
+
+<div class="stage">
+  <div class="card">
+    <div class="tape tl"></div>
+    <div class="tape tr"></div>
+
+    <div class="brand">
+      <div class="kicker">TAYGEDO / 登 陆 终 端</div>
+      <h1>TGD<span class="slash">/</span>SIGN</h1>
+      <span class="sub">扫码已废，短信直连</span>
+      <div class="stamp">{{ userId }}</div>
     </div>
 
-    <div class="field">
-      <label>验证码</label>
-      <div class="code-row">
-        <input type="text" id="code" inputmode="numeric" maxlength="6" placeholder="6位验证码" required>
-        <button type="button" id="sendBtn" class="btn btn-secondary" disabled>发送验证码</button>
+    <form id="loginForm" autocomplete="off">
+      <div class="field">
+        <span class="section-label">PHONE // 手机号</span>
+        <input type="tel" id="phone" inputmode="numeric" maxlength="11" placeholder="11 位中国大陆手机号" required>
       </div>
-    </div>
 
-    <button type="submit" id="loginBtn" class="btn btn-primary" disabled>登录</button>
-  </form>
+      <div class="field">
+        <span class="section-label">CODE // 验证码</span>
+        <div class="code-row">
+          <input type="text" id="code" inputmode="numeric" maxlength="6" placeholder="6 位数字验证码" required>
+          <button type="button" id="sendBtn" class="btn btn-send" disabled>SEND</button>
+        </div>
+      </div>
 
-  <div id="msg" class="msg"></div>
+      <button type="submit" id="loginBtn" class="btn btn-go" disabled>BLAST OFF // 登 录</button>
+    </form>
 
-  <div class="footer">请勿使用他人链接 · 3分钟内有效</div>
+    <div id="msg" class="msg"></div>
+
+    <div class="footer">请勿使用他人链接&nbsp;·&nbsp;3 MIN</div>
+
+    <div class="byline">TOKEN :: LIVE</div>
+  </div>
 </div>
 
 <script>
@@ -178,7 +506,6 @@ const sendBtn = document.getElementById('sendBtn');
 const loginBtn = document.getElementById('loginBtn');
 const msgEl = document.getElementById('msg');
 const AUTH = '{{ auth }}';
-const SERVER = '{{ server_url }}';
 
 function showMsg(text, ok) {
   msgEl.textContent = text;
@@ -200,16 +527,16 @@ sendBtn.addEventListener('click', async () => {
   const orig = sendBtn.textContent;
 
   try {
-    const r = await fetch(SERVER + '/tgd/sendcode', {
+    const r = await fetch('/tgd/sendcode', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({auth: AUTH, phone: phone.value})
     });
     const d = await r.json();
     if (d.success) {
-      showMsg('验证码已发送', true);
+      showMsg('验证码已喷出', true);
       const t = setInterval(() => {
-        sendBtn.textContent = cd + 's';
+        sendBtn.textContent = cd + 'S';
         if (--cd < 0) { clearInterval(t); sendBtn.textContent = orig; sendBtn.disabled = false; }
       }, 1000);
     } else {
@@ -227,15 +554,15 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   loginBtn.disabled = true;
 
   try {
-    const r = await fetch(SERVER + '/tgd/login', {
+    const r = await fetch('/tgd/login', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({auth: AUTH, mobile: phone.value, code: code.value})
     });
     const d = await r.json();
     if (d.success) {
-      showMsg('登录成功！请返回聊天查看结果', true);
-      loginBtn.textContent = '已完成';
+      showMsg('登录成功！返回聊天窗查看结果', true);
+      loginBtn.textContent = '已 完 成';
     } else {
       showMsg(d.msg || '登录失败', false);
       loginBtn.disabled = false;

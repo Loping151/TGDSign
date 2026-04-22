@@ -50,7 +50,7 @@ def _get_proxy() -> Optional[str]:
 class TaygedoApi:
     def _get_client(self) -> httpx.AsyncClient:
         proxy = _get_proxy()
-        return httpx.AsyncClient(timeout=200, proxy=proxy)
+        return httpx.AsyncClient(timeout=200, proxy=proxy, trust_env=False)
 
     async def send_captcha(self, phone: str, device_id: str):
         data = {

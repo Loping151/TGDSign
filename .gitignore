@@ -1,5 +1,3 @@
 __pycache__/
 *.pyc
 *.pyo
-*.json
-!TGDSign/tgdsign_config/config_default.py

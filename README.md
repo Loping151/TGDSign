@@ -1,6 +1,6 @@
 # TGDSign - 塔吉多签到插件
 
-基于 gsuid_core 的塔吉多(Taygedo)APP签到插件，支持APP签到和游戏签到。
+基于 gsuid_core 的塔吉多(Taygedo)APP签到插件，支持APP签到和游戏签到。可能成为幻塔UID的前身并包含TGD CORE。
 
 ## 功能
 
