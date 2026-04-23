@@ -1,6 +1,6 @@
 # TGDSign - 塔吉多签到插件
 
-基于 gsuid_core 的塔吉多(Taygedo)APP签到插件，支持APP签到和游戏签到。异环(NTE)相关功能可参考 [NTEUID](https://github.com/tyql688/NTEUID)。
+基于 gsuid_core 的塔吉多(Taygedo)APP签到插件，支持APP签到和游戏签到。由于已有 [NTEUID](https://github.com/tyql688/NTEUID)，此处应该不会继续。
 
 ## 功能
 
