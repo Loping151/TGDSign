@@ -57,4 +57,15 @@ CONIFG_DEFAULT: Dict[str, GSC] = {
         "API请求使用的代理地址，为空则不使用代理",
         "",
     ),
+    "AnnOpen": GsBoolConfig(
+        "公告推送",
+        "是否开启异环公告推送功能",
+        True,
+    ),
+    "AnnMinuteCheck": GsIntConfig(
+        "公告轮询间隔(分钟)",
+        "定时查询新公告的间隔，单位分钟",
+        10,
+        max_value=120,
+    ),
 }

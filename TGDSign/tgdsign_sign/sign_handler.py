@@ -15,6 +15,7 @@ from gsuid_core.subscribe import gs_subscribe
 from ..tgdsign_config import SIGN_RESULT_TYPE
 from ..tgdsign_config.tgdsign_config import TGDSignConfig
 from ..utils.api.requests import tgd_api
+from ..utils.api.api import GAMEID_HT
 from ..utils.database.models import (
     TGDBind,
     TGDSignData,
@@ -87,56 +88,64 @@ async def _do_sign_for_account(
     else:
         msg_parts.append("社区今日已签到")
 
-    # 游戏签到 (每个角色)
+    # 游戏签到 (每个角色，按所属游戏分别调用对应 gameId 的接口)
     role_users = [u for u in tgd_users if u.uid != u.tgd_uid]
     if role_users:
         await asyncio.sleep(random.uniform(0.5, 1.5))
 
-        signin_state = await tgd_api.get_signin_state(
-            access_token=access_token
-        )
-        signin_rewards = await tgd_api.get_signin_rewards(
-            access_token=access_token
-        )
+        # 按 game_id 分组：每个游戏单独查询签到状态和奖励表
+        users_by_game: Dict[str, List[TGDUser]] = defaultdict(list)
+        for u in role_users:
+            users_by_game[u.game_id or GAMEID_HT].append(u)
 
-        for user in role_users:
-            role_sign = await TGDSignRecord.get_sign_data(user.uid)
-            rname = user.role_name or user.uid
-
-            if role_sign and role_sign.game_sign >= 1:
-                msg_parts.append(f"{rname} 今日已签到")
-                continue
-
-            res = await tgd_api.game_signin(
-                access_token=access_token, role_id=user.uid
+        for game_id, game_users in users_by_game.items():
+            signin_state = await tgd_api.get_signin_state(
+                access_token=access_token, game_id=game_id
             )
-            if res["status"]:
-                reward_msg = "游戏签到成功"
-                if signin_state["status"] and signin_rewards["status"]:
-                    try:
-                        days = signin_state["data"]["days"]
-                        reward = signin_rewards["data"][days]
-                        reward_msg = (
-                            f"获得{reward['name']}*{reward['num']}"
-                        )
-                    except (KeyError, IndexError, TypeError):
-                        pass
-                msg_parts.append(f"{rname} {reward_msg}")
-                await TGDSignRecord.upsert_sign(
-                    TGDSignData.build_game_sign(user.uid)
-                )
-            else:
-                msg = res["message"]
-                if "已经签到" in msg or "签到过" in msg or "重复签到" in msg:
+            signin_rewards = await tgd_api.get_signin_rewards(
+                access_token=access_token, game_id=game_id
+            )
+
+            for user in game_users:
+                role_sign = await TGDSignRecord.get_sign_data(user.uid)
+                rname = user.role_name or user.uid
+
+                if role_sign and role_sign.game_sign >= 1:
                     msg_parts.append(f"{rname} 今日已签到")
+                    continue
+
+                res = await tgd_api.game_signin(
+                    access_token=access_token,
+                    role_id=user.uid,
+                    game_id=game_id,
+                )
+                if res["status"]:
+                    reward_msg = "游戏签到成功"
+                    if signin_state["status"] and signin_rewards["status"]:
+                        try:
+                            days = signin_state["data"]["days"]
+                            reward = signin_rewards["data"][days]
+                            reward_msg = (
+                                f"获得{reward['name']}*{reward['num']}"
+                            )
+                        except (KeyError, IndexError, TypeError):
+                            pass
+                    msg_parts.append(f"{rname} {reward_msg}")
                     await TGDSignRecord.upsert_sign(
                         TGDSignData.build_game_sign(user.uid)
                     )
                 else:
-                    msg_parts.append(f"{rname} 游戏签到失败: {msg}")
+                    msg = res["message"]
+                    if "已经签到" in msg or "签到过" in msg or "重复签到" in msg:
+                        msg_parts.append(f"{rname} 今日已签到")
+                        await TGDSignRecord.upsert_sign(
+                            TGDSignData.build_game_sign(user.uid)
+                        )
+                    else:
+                        msg_parts.append(f"{rname} 游戏签到失败: {msg}")
 
-            if len(role_users) > 1:
-                await asyncio.sleep(random.uniform(0.3, 0.8))
+                if len(role_users) > 1:
+                    await asyncio.sleep(random.uniform(0.3, 0.8))
 
     return "\n".join(msg_parts)
 

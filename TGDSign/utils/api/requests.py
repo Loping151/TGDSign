@@ -1,5 +1,6 @@
 """塔吉多 API 请求封装"""
 
+import json
 import time
 import traceback
 import urllib.parse as qs
@@ -19,8 +20,9 @@ from .api import (
     DEVICENAME,
     DEVICESYS,
     DEVICETYPE,
-    GAMEID,
+    GAMEID_HT,
     REQUEST_HEADERS_BASE,
+    WEB_HEADERS_BASE,
     SDKVERSION,
     TYPE,
     USERCENTERAPPID,
@@ -36,6 +38,9 @@ from .api import (
     GETSIGNINSTATE,
     GETSIGNINREWARDS,
     GETGAMEROLES,
+    GETUSERPOSTLIST,
+    GETPOSTFULL,
+    YIHUAN_OFFICIAL_UID,
 )
 from .calculate import aes_base64_encode, generate_sign
 
@@ -275,7 +280,7 @@ class TaygedoApi:
             logger.error(traceback.format_exc())
             return {"status": False, "message": "刷新token失败，详情请查看日志"}
 
-    async def get_bind_role(self, access_token: str, uid: str):
+    async def get_bind_role(self, access_token: str, uid: str, game_id: str = GAMEID_HT):
         headers = {"Authorization": access_token}
 
         try:
@@ -283,7 +288,7 @@ class TaygedoApi:
                 response = await client.get(
                     GETBINDROLE,
                     headers=headers,
-                    params={"uid": uid, "gameId": GAMEID},
+                    params={"uid": uid, "gameId": game_id},
                 )
             resp = response.json()
             logger.info(f"[TGDSign] 获取绑定角色响应: {resp}")
@@ -308,8 +313,13 @@ class TaygedoApi:
             logger.error(traceback.format_exc())
             return {"status": False, "message": "获取绑定角色失败，详情请查看日志"}
 
-    async def get_game_roles(self, access_token: str, uid: str, device_id: str):
-        """获取用户所有游戏角色列表"""
+    async def get_game_roles(
+        self,
+        access_token: str,
+        uid: str,
+        device_id: str,
+        game_id: str = GAMEID_HT,
+    ):
         headers = {
             "platform": "android",
             "authorization": access_token,
@@ -324,7 +334,7 @@ class TaygedoApi:
                 response = await client.get(
                     GETGAMEROLES,
                     headers=headers,
-                    params={"gameId": GAMEID},
+                    params={"gameId": game_id},
                 )
             resp = response.json()
             logger.info(f"[TGDSign] 获取游戏角色列表响应: {resp}")
@@ -389,8 +399,13 @@ class TaygedoApi:
             logger.error(traceback.format_exc())
             return {"status": False, "message": "APP签到失败，详情请查看日志"}
 
-    async def game_signin(self, access_token: str, role_id: str):
-        data = {"roleId": role_id, "gameId": GAMEID}
+    async def game_signin(
+        self,
+        access_token: str,
+        role_id: str,
+        game_id: str = GAMEID_HT,
+    ):
+        data = {"roleId": role_id, "gameId": game_id}
         payload = qs.urlencode(data)
         headers = {**REQUEST_HEADERS_BASE, "authorization": access_token}
 
@@ -419,7 +434,7 @@ class TaygedoApi:
             logger.error(traceback.format_exc())
             return {"status": False, "message": "游戏签到失败，详情请查看日志"}
 
-    async def get_signin_state(self, access_token: str):
+    async def get_signin_state(self, access_token: str, game_id: str = GAMEID_HT):
         headers = {"Authorization": access_token}
 
         try:
@@ -427,7 +442,7 @@ class TaygedoApi:
                 response = await client.get(
                     GETSIGNINSTATE,
                     headers=headers,
-                    params={"gameId": GAMEID},
+                    params={"gameId": game_id},
                 )
             resp = response.json()
             logger.debug(f"[TGDSign] 获取签到状态响应: {resp}")
@@ -452,7 +467,7 @@ class TaygedoApi:
             logger.error(traceback.format_exc())
             return {"status": False, "message": "获取签到状态失败，详情请查看日志"}
 
-    async def get_signin_rewards(self, access_token: str):
+    async def get_signin_rewards(self, access_token: str, game_id: str = GAMEID_HT):
         headers = {"Authorization": access_token}
 
         try:
@@ -460,7 +475,7 @@ class TaygedoApi:
                 response = await client.get(
                     GETSIGNINREWARDS,
                     headers=headers,
-                    params={"gameId": GAMEID},
+                    params={"gameId": game_id},
                 )
             resp = response.json()
             logger.debug(f"[TGDSign] 获取签到奖励响应: {resp}")
@@ -484,6 +499,157 @@ class TaygedoApi:
             logger.error(f"[TGDSign] 获取签到奖励异常: {e}")
             logger.error(traceback.format_exc())
             return {"status": False, "message": "获取签到奖励失败，详情请查看日志"}
+
+
+    # ===================== 论坛公告（无需鉴权） =====================
+
+    # 列表缓存（全局，进程内）
+    ann_list_data: list = []
+    ann_list_cache_time: float = 0
+    ann_map: dict = {}
+    ANN_LIST_CACHE_DURATION = 600  # 10 分钟
+
+    async def get_ann_list(
+        self,
+        is_cache: bool = False,
+        uid: str = YIHUAN_OFFICIAL_UID,
+        count: int = 20,
+    ) -> list:
+        """拉取官方账号的帖子列表（作为公告列表）。
+
+        返回列表元素保留以下关键字段，便于卡片渲染：
+          id, subject, content, createTime, sendTime, cover, region,
+          likeNum, commentNum, collectNum, images, vods
+        """
+        current_time = time.time()
+        cache_valid = (
+            self.ann_list_data
+            and (current_time - self.ann_list_cache_time)
+            < self.ANN_LIST_CACHE_DURATION
+        )
+        if is_cache and cache_valid:
+            logger.debug(
+                f"[TGDSign][Ann] 使用缓存列表（距上次 "
+                f"{int(current_time - self.ann_list_cache_time)} 秒）"
+            )
+            return self.ann_list_data
+
+        try:
+            async with self._get_client() as client:
+                resp = await client.get(
+                    GETUSERPOSTLIST,
+                    params={"uid": uid, "count": count, "version": 0},
+                    headers=WEB_HEADERS_BASE,
+                )
+            body = resp.json()
+        except Exception as e:
+            logger.error(f"[TGDSign][Ann] 获取公告列表异常: {e}")
+            return []
+
+        if body.get("code") != 0:
+            logger.error(f"[TGDSign][Ann] 列表接口非 0 返回: {body}")
+            return []
+
+        posts = (body.get("data") or {}).get("posts") or []
+        result = []
+        for p in posts:
+            if p.get("isDelete") or p.get("deleteTime"):
+                continue
+            images = p.get("images") or []
+            cover = images[0].get("url", "") if images else ""
+            if not cover and p.get("vods"):
+                v = p["vods"][0]
+                if isinstance(v, dict):
+                    vc = v.get("cover", "")
+                    if isinstance(vc, dict):
+                        cover = vc.get("url", "")
+                    elif isinstance(vc, str) and vc:
+                        cover = vc
+                    else:
+                        cover = v.get("url", "")
+            stat = p.get("postStat") or {}
+            result.append({
+                "id": p.get("postId"),
+                "subject": p.get("subject", "") or _first_line(p.get("content", "")),
+                "content": p.get("content", ""),
+                "structuredContent": p.get("structuredContent", ""),
+                "createTime": p.get("createTime") or p.get("sendTime") or 0,
+                "sendTime": p.get("sendTime") or p.get("createTime") or 0,
+                "cover": cover,
+                "region": p.get("region", ""),
+                "likeNum": stat.get("likeNum", 0),
+                "commentNum": stat.get("commentNum", 0),
+                "collectNum": stat.get("collectNum", 0),
+                "images": images,
+                "vods": p.get("vods") or [],
+                "columnId": p.get("columnId"),
+                "communityId": p.get("communityId"),
+            })
+
+        self.ann_list_data = result
+        self.ann_list_cache_time = current_time
+        logger.info(f"[TGDSign][Ann] 获取到 {len(result)} 条公告")
+        return result
+
+    async def get_ann_detail(self, post_id) -> Optional[dict]:
+        """拉取单篇帖子详情（富文本 content 是 HTML，structuredContent 是顺序片段）。"""
+        pid = str(post_id)
+        if pid in self.ann_map:
+            return self.ann_map[pid]
+
+        try:
+            async with self._get_client() as client:
+                resp = await client.get(
+                    GETPOSTFULL,
+                    params={"postId": pid},
+                    headers=WEB_HEADERS_BASE,
+                )
+            body = resp.json()
+        except Exception as e:
+            logger.error(f"[TGDSign][Ann] 获取详情异常 id={post_id}: {e}")
+            return None
+
+        if body.get("code") != 0:
+            logger.error(f"[TGDSign][Ann] 详情接口非 0 返回 id={post_id}: {body}")
+            return None
+
+        data = body.get("data") or {}
+        post = data.get("post") or {}
+        stat = post.get("postStat") or {}
+        structured_raw = post.get("structuredContent") or ""
+        structured = []
+        if structured_raw:
+            try:
+                structured = json.loads(structured_raw)
+            except Exception:
+                structured = []
+
+        result = {
+            "id": post.get("postId"),
+            "subject": post.get("subject", "") or _first_line(post.get("content", "")),
+            "content": post.get("content", ""),  # HTML
+            "structured": structured,            # 有序片段
+            "createTime": post.get("createTime") or post.get("sendTime") or 0,
+            "sendTime": post.get("sendTime") or post.get("createTime") or 0,
+            "region": post.get("region", ""),
+            "likeNum": stat.get("likeNum", 0),
+            "commentNum": stat.get("commentNum", 0),
+            "collectNum": stat.get("collectNum", 0),
+            "images": post.get("images") or [],
+            "vods": post.get("vods") or [],
+        }
+        self.ann_map[pid] = result
+        return result
+
+
+def _first_line(text: str, maxlen: int = 60) -> str:
+    if not text:
+        return ""
+    for line in text.splitlines():
+        s = line.strip().replace("[图片]", "").strip()
+        if s:
+            return s[:maxlen]
+    return text[:maxlen]
 
 
 tgd_api = TaygedoApi()
